@@ -21,9 +21,28 @@ interface SessionInfo {
 const activeSessions = new Map<string, SessionInfo>();
 let orderSequence = 1000;
 
+function extractSessionId(req: Request): string | undefined {
+  if (req.cookies && req.cookies['B1SESSION']) {
+    return req.cookies['B1SESSION'];
+  }
+  const rawCookie = req.headers['cookie'];
+  if (rawCookie) {
+    const match = rawCookie.match(/B1SESSION=([^;]+)/);
+    if (match) return match[1];
+  }
+  const auth = req.headers['authorization'];
+  if (auth && auth.startsWith('Bearer ')) {
+    return auth.substring(7);
+  }
+  const customHeader = req.headers['b1session'] as string;
+  if (customHeader) return customHeader;
+  return undefined;
+}
+
 // Middleware de autenticación por Cookie B1SESSION
 function authenticateB1Session(req: Request, res: Response, next: NextFunction) {
-  const b1Session = req.cookies['B1SESSION'] || (req.headers['authorization']?.replace('Bearer ', ''));
+  const b1Session = extractSessionId(req);
+  console.log(`[AUTH] ${req.method} ${req.url} -> Extracted Session: ${b1Session ? b1Session.substring(0, 8) + '...' : 'NONE'}`);
   
   if (!b1Session || !activeSessions.has(b1Session)) {
     return res.status(401).json({
@@ -78,8 +97,8 @@ app.post('/b1s/v2/Login', (req: Request, res: Response) => {
   });
 
   // Establecer cookies idénticas a SAP Business One Service Layer
-  res.cookie('B1SESSION', sessionId, { httpOnly: true, path: '/b1s/v2' });
-  res.cookie('ROUTEID', '.node1', { path: '/b1s/v2' });
+  res.cookie('B1SESSION', sessionId, { httpOnly: true, path: '/' });
+  res.cookie('ROUTEID', '.node1', { path: '/' });
 
   return res.status(200).json({
     'odata.metadata': `http://localhost:${PORT}/b1s/v2/$metadata#B1Sessions/@Element`,
@@ -91,12 +110,12 @@ app.post('/b1s/v2/Login', (req: Request, res: Response) => {
 
 // 2. POST /b1s/v2/Logout
 app.post('/b1s/v2/Logout', (req: Request, res: Response) => {
-  const b1Session = req.cookies['B1SESSION'];
+  const b1Session = extractSessionId(req);
   if (b1Session) {
     activeSessions.delete(b1Session);
   }
-  res.clearCookie('B1SESSION', { path: '/b1s/v2' });
-  res.clearCookie('ROUTEID', { path: '/b1s/v2' });
+  res.clearCookie('B1SESSION', { path: '/' });
+  res.clearCookie('ROUTEID', { path: '/' });
   return res.status(204).send();
 });
 
