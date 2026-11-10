@@ -35,23 +35,23 @@ sequenceDiagram
     participant B1 as SAP B1 Service Layer
 
     Cliente->>CPI: POST /api/v1/orders (Payload JSON)
-    CPI->>Cache: Consultar sesión activa (B1SESSION + ROUTEID)
+    CPI->>Cache: Consultar sesion activa (B1SESSION y ROUTEID)
     
-    alt Sesión no existe o expirada
+    alt Sesion no existe o expirada
         CPI->>B1: POST /b1s/v2/Login (Credentials BTP)
         B1-->>CPI: 200 OK + Set-Cookie (B1SESSION, ROUTEID)
         CPI->>Cache: Guardar tokens (TTL configurable)
-    else Sesión válida en caché
+    else Sesion valida en cache
         Cache-->>CPI: Retornar B1SESSION activa
     end
 
-    CPI->>B1: POST /b1s/v2/Orders (Cookie: B1SESSION; ROUTEID)
+    CPI->>B1: POST /b1s/v2/Orders (Cookie: B1SESSION, ROUTEID)
     
-    alt Error 401 Unauthorized (Sesión invalidada en servidor)
-        Note over CPI,B1: Mecanismo de Recuperación Automática (401 Replay)
+    alt Error 401 Unauthorized (Sesion invalidada en servidor)
+        Note over CPI,B1: Mecanismo de Recuperacion Automatica (401 Replay)
         CPI->>B1: POST /b1s/v2/Login
         B1-->>CPI: Nuevo B1SESSION
-        CPI->>Cache: Actualizar caché
+        CPI->>Cache: Actualizar cache
         CPI->>B1: Reintentar POST /b1s/v2/Orders
     end
 
